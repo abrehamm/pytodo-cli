@@ -3,14 +3,7 @@ from rich.console import Console
 from rich.table import box, Table
 import typer
 
-from db import (
-    delete_todo,
-    get_all_todos,
-    get_single_todo,
-    insert_todo,
-    update_todo,
-    complete_todo,
-)
+from db import Database
 from model import Todo
 
 
@@ -20,6 +13,8 @@ def callback():
     """
 
 
+# app_db = None
+
 app = typer.Typer(callback=callback, no_args_is_help=True)
 console = Console()
 
@@ -28,13 +23,13 @@ console = Console()
 def add(task: str, category: str):
     todo = Todo(task=task, category=category)
     console.print(f"[bold green]Adding new todo -> {todo}[/bold green]")
-    insert_todo(todo)
+    app_db.insert_todo(todo)
     show(None)
 
 
 @app.command(short_help="delete a todo item")
 def delete(position: int):
-    op_status, msg = delete_todo(position=position - 1)
+    op_status, msg = app_db.delete_todo(position=position - 1)
     if op_status:
         console.print(f"[bold cyan]Deleted todo #{position}[/bold cyan]")
         show(None)
@@ -53,7 +48,9 @@ def update(
     task: str = typer.Option(None, help="new name of the task to be updated"),
     category: str = typer.Option(None, help="new category of the task to be updated"),
 ):
-    op_status, msg = update_todo(position=position - 1, task=task, category=category)
+    op_status, msg = app_db.update_todo(
+        position=position - 1, task=task, category=category
+    )
     if op_status:
         console.print(f"[bold cyan]Updated todo #{position}[/bold cyan]")
         show(None)
@@ -70,7 +67,7 @@ def update(
 
 @app.command(short_help="mark a todo item as completed")
 def complete(position: int):
-    op_satus = complete_todo(position=position - 1)
+    op_satus = app_db.complete_todo(position=position - 1)
     if not op_satus:
         console.print(
             f"[bold red]No todo item found for supplied position index: #{position}.[/bold red]"
@@ -83,21 +80,24 @@ def complete(position: int):
 def show(position: Optional[int] = typer.Argument(None)):
 
     if position is None:
-        todos = get_all_todos()
-        table = Table(title="Todos 🎯", show_header=True, header_style="bold blue")
-        table.add_column("#", style="dim", width=6)
-        table.add_column("Task", min_width=20)
-        table.add_column("Category", min_width=12, justify="right")
-        table.add_column("Done", min_width=15, justify="right")
+        todos = app_db.get_all_todos()
+        if todos == []:
+            console.print(f"[bold red]No todo items are stored yet.[/bold red]")
+        else:
+            table = Table(title="Todos 🎯", show_header=True, header_style="bold blue")
+            table.add_column("#", style="dim", width=6)
+            table.add_column("Task", min_width=20)
+            table.add_column("Category", min_width=12, justify="right")
+            table.add_column("Done", min_width=15, justify="right")
 
-        for todo in todos:
-            is_done_emoji = "✅" if todo.status == 2 else "❌"
-            table.add_row(
-                str(todo.position + 1), todo.task, todo.category, is_done_emoji
-            )
-        console.print(table)
+            for todo in todos:
+                is_done_emoji = "✅" if todo.status == 2 else "❌"
+                table.add_row(
+                    str(todo.position + 1), todo.task, todo.category, is_done_emoji
+                )
+            console.print(table)
     else:
-        todo = get_single_todo(position=position - 1)
+        todo = app_db.get_single_todo(position=position - 1)
         if todo:
             table = Table(
                 title=f"{todo.task}",
@@ -121,4 +121,10 @@ def show(position: Optional[int] = typer.Argument(None)):
 
 
 if __name__ == "__main__":
+    app_db = Database("todos.db")
     app()
+
+if __name__ != "__main__":
+    app_db = Database(
+        ":memory:"
+    )  # FIXME A quick fix for automating testing using pytest (couples app code with test!)

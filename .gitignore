@@ -27,3 +27,6 @@ cover/
 
 #DB related
 *.db
+
+# Others
+*.todo
